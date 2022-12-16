@@ -1,86 +1,90 @@
+import * as THREE from '../../../libs/three.js/build/three.module.js'
+import { Utils } from '../../utils.js'
+import { PointCloudTree } from '../../PointCloudTree.js'
+import { Annotation } from '../../Annotation.js'
+import { Measure } from '../../utils/Measure.js'
+import { Profile } from '../../utils/Profile.js'
+import { Volume, BoxVolume, SphereVolume } from '../../utils/Volume.js'
+import { CameraAnimation } from '../../modules/CameraAnimation/CameraAnimation.js'
+import {
+    PointSizeType,
+    PointShape,
+    ElevationGradientRepeat,
+} from '../../defines.js'
+import { Gradients } from '../../materials/Gradients.js'
 
-import * as THREE from "../../../libs/three.js/build/three.module.js";
-import {Utils} from "../../utils.js";
-import {PointCloudTree} from "../../PointCloudTree.js";
-import {Annotation} from "../../Annotation.js";
-import {Measure} from "../../utils/Measure.js";
-import {Profile} from "../../utils/Profile.js";
-import {Volume, BoxVolume, SphereVolume} from "../../utils/Volume.js";
-import {CameraAnimation} from "../../modules/CameraAnimation/CameraAnimation.js";
-import {PointSizeType, PointShape, ElevationGradientRepeat} from "../../defines.js";
-import {Gradients} from "../../materials/Gradients.js";
+import { MeasurePanel } from './MeasurePanel.js'
+import { DistancePanel } from './DistancePanel.js'
+import { PointPanel } from './PointPanel.js'
+import { AreaPanel } from './AreaPanel.js'
+import { AnglePanel } from './AnglePanel.js'
+import { CirclePanel } from './CirclePanel.js'
+import { HeightPanel } from './HeightPanel.js'
+import { VolumePanel } from './VolumePanel.js'
+import { ProfilePanel } from './ProfilePanel.js'
+import { CameraPanel } from './CameraPanel.js'
+import { AnnotationPanel } from './AnnotationPanel.js'
+import { CameraAnimationPanel } from './CameraAnimationPanel.js'
 
-import {MeasurePanel} from "./MeasurePanel.js";
-import {DistancePanel} from "./DistancePanel.js";
-import {PointPanel} from "./PointPanel.js";
-import {AreaPanel} from "./AreaPanel.js";
-import {AnglePanel} from "./AnglePanel.js";
-import {CirclePanel} from "./CirclePanel.js";
-import {HeightPanel} from "./HeightPanel.js";
-import {VolumePanel} from "./VolumePanel.js";
-import {ProfilePanel} from "./ProfilePanel.js";
-import {CameraPanel} from "./CameraPanel.js";
-import {AnnotationPanel} from "./AnnotationPanel.js";
-import { CameraAnimationPanel } from "./CameraAnimationPanel.js";
+export class PropertiesPanel {
+    constructor(container, viewer) {
+        this.container = container
+        this.viewer = viewer
+        this.object = null
+        this.cleanupTasks = []
+        this.scene = null
+    }
 
-export class PropertiesPanel{
+    setScene(scene) {
+        this.scene = scene
+    }
 
-	constructor(container, viewer){
-		this.container = container;
-		this.viewer = viewer;
-		this.object = null;
-		this.cleanupTasks = [];
-		this.scene = null;
-	}
+    set(object) {
+        if (this.object === object) {
+            return
+        }
 
-	setScene(scene){
-		this.scene = scene;
-	}
+        this.object = object
 
-	set(object){
-		if(this.object === object){
-			return;
-		}
+        for (let task of this.cleanupTasks) {
+            task()
+        }
+        this.cleanupTasks = []
+        this.container.empty()
 
-		this.object = object;
-		
-		for(let task of this.cleanupTasks){
-			task();
-		}
-		this.cleanupTasks = [];
-		this.container.empty();
+        if (object instanceof PointCloudTree) {
+            this.setPointCloud(object)
+        } else if (
+            object instanceof Measure ||
+            object instanceof Profile ||
+            object instanceof Volume
+        ) {
+            this.setMeasurement(object)
+        } else if (object instanceof THREE.Camera) {
+            this.setCamera(object)
+        } else if (object instanceof Annotation) {
+            this.setAnnotation(object)
+        } else if (object instanceof CameraAnimation) {
+            this.setCameraAnimation(object)
+        }
+    }
 
-		if(object instanceof PointCloudTree){
-			this.setPointCloud(object);
-		}else if(object instanceof Measure || object instanceof Profile || object instanceof Volume){
-			this.setMeasurement(object);
-		}else if(object instanceof THREE.Camera){
-			this.setCamera(object);
-		}else if(object instanceof Annotation){
-			this.setAnnotation(object);
-		}else if(object instanceof CameraAnimation){
-			this.setCameraAnimation(object);
-		}
-		
-	}
+    //
+    // Used for events that should be removed when the property object changes.
+    // This is for listening to materials, scene, point clouds, etc.
+    // not required for DOM listeners, since they are automatically cleared by removing the DOM subtree.
+    //
+    addVolatileListener(target, type, callback) {
+        target.addEventListener(type, callback)
+        this.cleanupTasks.push(() => {
+            target.removeEventListener(type, callback)
+        })
+    }
 
-	//
-	// Used for events that should be removed when the property object changes.
-	// This is for listening to materials, scene, point clouds, etc.
-	// not required for DOM listeners, since they are automatically cleared by removing the DOM subtree.
-	//
-	addVolatileListener(target, type, callback){
-		target.addEventListener(type, callback);
-		this.cleanupTasks.push(() => {
-			target.removeEventListener(type, callback);
-		});
-	}
+    setPointCloud(pointcloud) {
+        let material = pointcloud.material
 
-	setPointCloud(pointcloud){
-
-		let material = pointcloud.material;
-
-		let panel = $(`
+        let panel = $(`
 			<div class="scene_content selectable">
 				<ul class="pv-menu-list">
 
@@ -237,110 +241,121 @@ export class PropertiesPanel{
 
 				</ul>
 			</div>
-		`);
+		`)
 
-		panel.i18n();
-		this.container.append(panel);
+        panel.i18n()
+        this.container.append(panel)
 
-		{ // POINT SIZE
-			let sldPointSize = panel.find(`#sldPointSize`);
-			let lblPointSize = panel.find(`#lblPointSize`);
+        {
+            // POINT SIZE
+            let sldPointSize = panel.find(`#sldPointSize`)
+            let lblPointSize = panel.find(`#lblPointSize`)
 
-			sldPointSize.slider({
-				value: material.size,
-				min: 0,
-				max: 3,
-				step: 0.01,
-				slide: function (event, ui) { material.size = ui.value; }
-			});
+            sldPointSize.slider({
+                value: material.size,
+                min: 0,
+                max: 3,
+                step: 0.01,
+                slide: function (event, ui) {
+                    material.size = ui.value
+                },
+            })
 
-			let update = (e) => {
-				lblPointSize.html(material.size.toFixed(2));
-				sldPointSize.slider({value: material.size});
-			};
-			this.addVolatileListener(material, "point_size_changed", update);
-			
-			update();
-		}
+            let update = (e) => {
+                lblPointSize.html(material.size.toFixed(2))
+                sldPointSize.slider({ value: material.size })
+            }
+            this.addVolatileListener(material, 'point_size_changed', update)
 
-		{ // MINIMUM POINT SIZE
-			let sldMinPointSize = panel.find(`#sldMinPointSize`);
-			let lblMinPointSize = panel.find(`#lblMinPointSize`);
+            update()
+        }
 
-			sldMinPointSize.slider({
-				value: material.size,
-				min: 0,
-				max: 3,
-				step: 0.01,
-				slide: function (event, ui) { material.minSize = ui.value; }
-			});
+        {
+            // MINIMUM POINT SIZE
+            let sldMinPointSize = panel.find(`#sldMinPointSize`)
+            let lblMinPointSize = panel.find(`#lblMinPointSize`)
 
-			let update = (e) => {
-				lblMinPointSize.html(material.minSize.toFixed(2));
-				sldMinPointSize.slider({value: material.minSize});
-			};
-			this.addVolatileListener(material, "point_size_changed", update);
-			
-			update();
-		}
+            sldMinPointSize.slider({
+                value: material.size,
+                min: 0,
+                max: 3,
+                step: 0.01,
+                slide: function (event, ui) {
+                    material.minSize = ui.value
+                },
+            })
 
-		{ // POINT SIZING
-			let strSizeType = Object.keys(PointSizeType)[material.pointSizeType];
+            let update = (e) => {
+                lblMinPointSize.html(material.minSize.toFixed(2))
+                sldMinPointSize.slider({ value: material.minSize })
+            }
+            this.addVolatileListener(material, 'point_size_changed', update)
 
-			let opt = panel.find(`#optPointSizing`);
-			opt.selectmenu();
-			opt.val(strSizeType).selectmenu('refresh');
+            update()
+        }
 
-			opt.selectmenu({
-				change: (event, ui) => {
-					material.pointSizeType = PointSizeType[ui.item.value];
-				}
-			});
-		}
+        {
+            // POINT SIZING
+            let strSizeType = Object.keys(PointSizeType)[material.pointSizeType]
 
-		{ // SHAPE
-			let opt = panel.find(`#optShape`);
+            let opt = panel.find(`#optPointSizing`)
+            opt.selectmenu()
+            opt.val(strSizeType).selectmenu('refresh')
 
-			opt.selectmenu({
-				change: (event, ui) => {
-					let value = ui.item.value;
+            opt.selectmenu({
+                change: (event, ui) => {
+                    material.pointSizeType = PointSizeType[ui.item.value]
+                },
+            })
+        }
 
-					material.shape = PointShape[value];
-				}
-			});
+        {
+            // SHAPE
+            let opt = panel.find(`#optShape`)
 
-			let update = () => {
-				let typename = Object.keys(PointShape)[material.shape];
+            opt.selectmenu({
+                change: (event, ui) => {
+                    let value = ui.item.value
 
-				opt.selectmenu().val(typename).selectmenu('refresh');
-			};
-			this.addVolatileListener(material, "point_shape_changed", update);
+                    material.shape = PointShape[value]
+                },
+            })
 
-			update();
-		}
+            let update = () => {
+                let typename = Object.keys(PointShape)[material.shape]
 
-		{ // BACKFACE CULLING
-			
-			let opt = panel.find(`#set_backface_culling`);
-			opt.click(() => {
-				material.backfaceCulling = opt.prop("checked");
-			});
-			let update = () => {
-				let value = material.backfaceCulling;
-				opt.prop("checked", value);
-			};
-			this.addVolatileListener(material, "backface_changed", update);
-			update();
+                opt.selectmenu().val(typename).selectmenu('refresh')
+            }
+            this.addVolatileListener(material, 'point_shape_changed', update)
 
-			let blockBackface = $('#materials_backface_container');
-			blockBackface.css('display', 'none');
+            update()
+        }
 
-			const pointAttributes = pointcloud.pcoGeometry.pointAttributes;
-			const hasNormals = pointAttributes.hasNormals ? pointAttributes.hasNormals() : false;
-			if(hasNormals) {
-				blockBackface.css('display', 'block');
-			}
-			/*
+        {
+            // BACKFACE CULLING
+
+            let opt = panel.find(`#set_backface_culling`)
+            opt.click(() => {
+                material.backfaceCulling = opt.prop('checked')
+            })
+            let update = () => {
+                let value = material.backfaceCulling
+                opt.prop('checked', value)
+            }
+            this.addVolatileListener(material, 'backface_changed', update)
+            update()
+
+            let blockBackface = $('#materials_backface_container')
+            blockBackface.css('display', 'none')
+
+            const pointAttributes = pointcloud.pcoGeometry.pointAttributes
+            const hasNormals = pointAttributes.hasNormals
+                ? pointAttributes.hasNormals()
+                : false
+            if (hasNormals) {
+                blockBackface.css('display', 'block')
+            }
+            /*
 			opt.checkboxradio({
 				clicked: (event, ui) => {
 					// let value = ui.item.value;
@@ -350,582 +365,793 @@ export class PropertiesPanel{
 				}
 			});
 			*/
-		}
+        }
 
-		{ // OPACITY
-			let sldOpacity = panel.find(`#sldOpacity`);
-			let lblOpacity = panel.find(`#lblOpacity`);
+        {
+            // OPACITY
+            let sldOpacity = panel.find(`#sldOpacity`)
+            let lblOpacity = panel.find(`#lblOpacity`)
 
-			sldOpacity.slider({
-				value: material.opacity,
-				min: 0,
-				max: 1,
-				step: 0.001,
-				slide: function (event, ui) { 
-					material.opacity = ui.value;
-				}
-			});
+            sldOpacity.slider({
+                value: material.opacity,
+                min: 0,
+                max: 1,
+                step: 0.001,
+                slide: function (event, ui) {
+                    material.opacity = ui.value
+                },
+            })
 
-			let update = (e) => {
-				lblOpacity.html(material.opacity.toFixed(2));
-				sldOpacity.slider({value: material.opacity});
-			};
-			this.addVolatileListener(material, "opacity_changed", update);
+            let update = (e) => {
+                lblOpacity.html(material.opacity.toFixed(2))
+                sldOpacity.slider({ value: material.opacity })
+            }
+            this.addVolatileListener(material, 'opacity_changed', update)
 
-			update();
-		}
+            update()
+        }
 
-		{
+        {
+            const attributes = pointcloud.pcoGeometry.pointAttributes.attributes
 
-			const attributes = pointcloud.pcoGeometry.pointAttributes.attributes;
+            let options = []
 
-			let options = [];
+            options.push(...attributes.map((a) => a.name))
 
-			options.push(...attributes.map(a => a.name));
+            const intensityIndex = options.indexOf('intensity')
+            if (intensityIndex >= 0) {
+                options.splice(intensityIndex + 1, 0, 'intensity gradient')
+            }
 
-			const intensityIndex = options.indexOf("intensity");
-			if(intensityIndex >= 0){
-				options.splice(intensityIndex + 1, 0, "intensity gradient");
-			}
+            options.push(
+                'elevation',
+                'color',
+                'matcap',
+                'indices',
+                'level of detail',
+                'composite',
+            )
 
-			options.push(
-				"elevation",
-				"color",
-				'matcap',
-				'indices',
-				'level of detail',
-				'composite'
-			);
+            const blacklist = ['POSITION_CARTESIAN', 'position']
 
-			const blacklist = [
-				"POSITION_CARTESIAN",
-				"position",
-			];
+            options = options.filter((o) => !blacklist.includes(o))
 
-			options = options.filter(o => !blacklist.includes(o));
+            let attributeSelection = panel.find('#optMaterial')
+            for (let option of options) {
+                let elOption = $(`<option>${option}</option>`)
+                attributeSelection.append(elOption)
+            }
 
-			let attributeSelection = panel.find('#optMaterial');
-			for(let option of options){
-				let elOption = $(`<option>${option}</option>`);
-				attributeSelection.append(elOption);
-			}
+            let updateMaterialPanel = (event, ui) => {
+                let selectedValue = attributeSelection.selectmenu().val()
+                material.activeAttributeName = selectedValue
 
-			let updateMaterialPanel = (event, ui) => {
-				let selectedValue = attributeSelection.selectmenu().val();
-				material.activeAttributeName = selectedValue;
+                let attribute = pointcloud.getAttribute(selectedValue)
 
-				let attribute = pointcloud.getAttribute(selectedValue);
+                if (selectedValue === 'intensity gradient') {
+                    attribute = pointcloud.getAttribute('intensity')
+                }
 
-				if(selectedValue === "intensity gradient"){
-					attribute = pointcloud.getAttribute("intensity");
-				}
+                const isIntensity = attribute
+                    ? ['intensity', 'intensity gradient'].includes(
+                          attribute.name,
+                      )
+                    : false
 
-				const isIntensity = attribute ? ["intensity", "intensity gradient"].includes(attribute.name) : false;
+                if (isIntensity) {
+                    if (pointcloud.material.intensityRange[0] === Infinity) {
+                        pointcloud.material.intensityRange = attribute.range
+                    }
 
-				if(isIntensity){
-					if(pointcloud.material.intensityRange[0] === Infinity){
-						pointcloud.material.intensityRange = attribute.range;
-					}
+                    const [min, max] = attribute.range
 
-					const [min, max] = attribute.range;
+                    panel.find('#sldIntensityRange').slider({
+                        range: true,
+                        min: min,
+                        max: max,
+                        step: 0.01,
+                        values: [min, max],
+                        slide: (event, ui) => {
+                            let min = ui.values[0]
+                            let max = ui.values[1]
+                            material.intensityRange = [min, max]
+                        },
+                    })
+                } else if (attribute) {
+                    const [min, max] = attribute.range
 
-					panel.find('#sldIntensityRange').slider({
-						range: true,
-						min: min, max: max, step: 0.01,
-						values: [min, max],
-						slide: (event, ui) => {
-							let min = ui.values[0];
-							let max = ui.values[1];
-							material.intensityRange = [min, max];
-						}
-					});
-				} else if(attribute){
-					const [min, max] = attribute.range;
+                    let selectedRange = material.getRange(attribute.name)
 
-					let selectedRange = material.getRange(attribute.name);
+                    if (!selectedRange) {
+                        selectedRange = [...attribute.range]
+                    }
 
-					if(!selectedRange){
-						selectedRange = [...attribute.range];
-					}
+                    let minMaxAreNumbers =
+                        typeof min === 'number' && typeof max === 'number'
 
-					let minMaxAreNumbers = typeof min === "number" && typeof max === "number";
+                    if (minMaxAreNumbers) {
+                        panel.find('#sldExtraRange').slider({
+                            range: true,
+                            min: min,
+                            max: max,
+                            step: 0.01,
+                            values: selectedRange,
+                            slide: (event, ui) => {
+                                let [a, b] = ui.values
 
-					if(minMaxAreNumbers){
-						panel.find('#sldExtraRange').slider({
-							range: true,
-							min: min, 
-							max: max, 
-							step: 0.01,
-							values: selectedRange,
-							slide: (event, ui) => {
-								let [a, b] = ui.values;
+                                material.setRange(attribute.name, [a, b])
+                            },
+                        })
+                    }
+                }
 
-								material.setRange(attribute.name, [a, b]);
-							}
-						});
-					}
+                let blockWeights = $('#materials\\.composite_weight_container')
+                let blockElevation = $('#materials\\.elevation_container')
+                let blockRGB = $('#materials\\.rgb_container')
+                let blockExtra = $('#materials\\.extra_container')
+                let blockColor = $('#materials\\.color_container')
+                let blockIntensity = $('#materials\\.intensity_container')
+                let blockIndex = $('#materials\\.index_container')
+                let blockTransition = $('#materials\\.transition_container')
+                let blockGps = $('#materials\\.gpstime_container')
+                let blockMatcap = $('#materials\\.matcap_container')
 
-				}
+                blockIndex.css('display', 'none')
+                blockIntensity.css('display', 'none')
+                blockElevation.css('display', 'none')
+                blockRGB.css('display', 'none')
+                blockExtra.css('display', 'none')
+                blockColor.css('display', 'none')
+                blockWeights.css('display', 'none')
+                blockTransition.css('display', 'none')
+                blockMatcap.css('display', 'none')
+                blockGps.css('display', 'none')
 
-				let blockWeights = $('#materials\\.composite_weight_container');
-				let blockElevation = $('#materials\\.elevation_container');
-				let blockRGB = $('#materials\\.rgb_container');
-				let blockExtra = $('#materials\\.extra_container');
-				let blockColor = $('#materials\\.color_container');
-				let blockIntensity = $('#materials\\.intensity_container');
-				let blockIndex = $('#materials\\.index_container');
-				let blockTransition = $('#materials\\.transition_container');
-				let blockGps = $('#materials\\.gpstime_container');
-				let blockMatcap = $('#materials\\.matcap_container');
+                if (selectedValue === 'composite') {
+                    blockWeights.css('display', 'block')
+                    blockElevation.css('display', 'block')
+                    blockRGB.css('display', 'block')
+                    blockIntensity.css('display', 'block')
+                } else if (selectedValue === 'elevation') {
+                    blockElevation.css('display', 'block')
+                } else if (selectedValue === 'RGB and Elevation') {
+                    blockRGB.css('display', 'block')
+                    blockElevation.css('display', 'block')
+                } else if (selectedValue === 'rgba') {
+                    blockRGB.css('display', 'block')
+                } else if (selectedValue === 'color') {
+                    blockColor.css('display', 'block')
+                } else if (selectedValue === 'intensity') {
+                    blockIntensity.css('display', 'block')
+                } else if (selectedValue === 'intensity gradient') {
+                    blockIntensity.css('display', 'block')
+                } else if (selectedValue === 'indices') {
+                    blockIndex.css('display', 'block')
+                } else if (selectedValue === 'matcap') {
+                    blockMatcap.css('display', 'block')
+                } else if (selectedValue === 'classification') {
+                    // add classification color selctor?
+                } else if (selectedValue === 'gps-time') {
+                    blockGps.css('display', 'block')
+                } else if (selectedValue === 'number of returns') {
+                } else if (selectedValue === 'return number') {
+                } else if (
+                    ['source id', 'point source id'].includes(selectedValue)
+                ) {
+                } else {
+                    blockExtra.css('display', 'block')
+                }
+            }
 
-				blockIndex.css('display', 'none');
-				blockIntensity.css('display', 'none');
-				blockElevation.css('display', 'none');
-				blockRGB.css('display', 'none');
-				blockExtra.css('display', 'none');
-				blockColor.css('display', 'none');
-				blockWeights.css('display', 'none');
-				blockTransition.css('display', 'none');
-				blockMatcap.css('display', 'none');
-				blockGps.css('display', 'none');
+            attributeSelection.selectmenu({ change: updateMaterialPanel })
 
-				if (selectedValue === 'composite') {
-					blockWeights.css('display', 'block');
-					blockElevation.css('display', 'block');
-					blockRGB.css('display', 'block');
-					blockIntensity.css('display', 'block');
-				} else if (selectedValue === 'elevation') {
-					blockElevation.css('display', 'block');
-				} else if (selectedValue === 'RGB and Elevation') {
-					blockRGB.css('display', 'block');
-					blockElevation.css('display', 'block');
-				} else if (selectedValue === 'rgba') {
-					blockRGB.css('display', 'block');
-				} else if (selectedValue === 'color') {
-					blockColor.css('display', 'block');
-				} else if (selectedValue === 'intensity') {
-					blockIntensity.css('display', 'block');
-				} else if (selectedValue === 'intensity gradient') {
-					blockIntensity.css('display', 'block');
-				} else if (selectedValue === "indices" ){
-					blockIndex.css('display', 'block');
-				} else if (selectedValue === "matcap" ){
-					blockMatcap.css('display', 'block');
-				} else if (selectedValue === "classification" ){
-					// add classification color selctor?
-				} else if (selectedValue === "gps-time" ){
-					blockGps.css('display', 'block');
-				} else if(selectedValue === "number of returns"){
-					
-				} else if(selectedValue === "return number"){
-					
-				} else if(["source id", "point source id"].includes(selectedValue)){
-					
-				} else{
-					blockExtra.css('display', 'block');
-				}
-			};
+            let update = () => {
+                attributeSelection
+                    .val(material.activeAttributeName)
+                    .selectmenu('refresh')
+            }
+            this.addVolatileListener(
+                material,
+                'point_color_type_changed',
+                update,
+            )
+            this.addVolatileListener(
+                material,
+                'active_attribute_changed',
+                update,
+            )
 
-			attributeSelection.selectmenu({change: updateMaterialPanel});
+            update()
+            updateMaterialPanel()
+        }
 
-			let update = () => {
-				attributeSelection.val(material.activeAttributeName).selectmenu('refresh');
-			};
-			this.addVolatileListener(material, "point_color_type_changed", update);
-			this.addVolatileListener(material, "active_attribute_changed", update);
+        {
+            const schemes = Object.keys(Potree.Gradients).map((name) => ({
+                name: name,
+                values: Gradients[name],
+            }))
 
-			update();
-			updateMaterialPanel();
-		}
+            let elSchemeContainer = panel.find(
+                '#elevation_gradient_scheme_selection',
+            )
 
-		{
-			const schemes = Object.keys(Potree.Gradients).map(name => ({name: name, values: Gradients[name]}));
-
-			let elSchemeContainer = panel.find("#elevation_gradient_scheme_selection");
-
-			for(let scheme of schemes){
-				let elScheme = $(`
+            for (let scheme of schemes) {
+                let elScheme = $(`
 					<span style="flex-grow: 1;">
 					</span>
-				`);
+				`)
 
-				const svg = Potree.Utils.createSvgGradient(scheme.values);
-				svg.setAttributeNS(null, "class", `button-icon`);
+                const svg = Potree.Utils.createSvgGradient(scheme.values)
+                svg.setAttributeNS(null, 'class', `button-icon`)
 
-				elScheme.append($(svg));
+                elScheme.append($(svg))
 
-				elScheme.click( () => {
-					material.gradient = Gradients[scheme.name];
-				});
+                elScheme.click(() => {
+                    material.gradient = Gradients[scheme.name]
+                })
 
-				elSchemeContainer.append(elScheme);
-			}
-		}
+                elSchemeContainer.append(elScheme)
+            }
+        }
 
-		{
-			let matcaps = [
-				{name: "Normals", icon: `${Potree.resourcePath}/icons/matcap/check_normal+y.jpg`}, 
-				{name: "Basic 1", icon: `${Potree.resourcePath}/icons/matcap/basic_1.jpg`}, 
-				{name: "Basic 2", icon: `${Potree.resourcePath}/icons/matcap/basic_2.jpg`}, 
-				{name: "Basic Dark", icon: `${Potree.resourcePath}/icons/matcap/basic_dark.jpg`}, 
-				{name: "Basic Side", icon: `${Potree.resourcePath}/icons/matcap/basic_side.jpg`}, 
-				{name: "Ceramic Dark", icon: `${Potree.resourcePath}/icons/matcap/ceramic_dark.jpg`}, 
-				{name: "Ceramic Lightbulb", icon: `${Potree.resourcePath}/icons/matcap/ceramic_lightbulb.jpg`}, 
-				{name: "Clay Brown", icon: `${Potree.resourcePath}/icons/matcap/clay_brown.jpg`}, 
-				{name: "Clay Muddy", icon: `${Potree.resourcePath}/icons/matcap/clay_muddy.jpg`}, 
-				{name: "Clay Studio", icon: `${Potree.resourcePath}/icons/matcap/clay_studio.jpg`}, 
-				{name: "Resin", icon: `${Potree.resourcePath}/icons/matcap/resin.jpg`}, 
-				{name: "Skin", icon: `${Potree.resourcePath}/icons/matcap/skin.jpg`}, 
-				{name: "Jade", icon: `${Potree.resourcePath}/icons/matcap/jade.jpg`}, 
-				{name: "Metal_ Anisotropic", icon: `${Potree.resourcePath}/icons/matcap/metal_anisotropic.jpg`}, 
-				{name: "Metal Carpaint", icon: `${Potree.resourcePath}/icons/matcap/metal_carpaint.jpg`}, 
-				{name: "Metal Lead", icon: `${Potree.resourcePath}/icons/matcap/metal_lead.jpg`}, 
-				{name: "Metal Shiny", icon: `${Potree.resourcePath}/icons/matcap/metal_shiny.jpg`}, 
-				{name: "Pearl", icon: `${Potree.resourcePath}/icons/matcap/pearl.jpg`}, 
-				{name: "Toon", icon: `${Potree.resourcePath}/icons/matcap/toon.jpg`},
-				{name: "Check Rim Light", icon: `${Potree.resourcePath}/icons/matcap/check_rim_light.jpg`}, 
-				{name: "Check Rim Dark", icon: `${Potree.resourcePath}/icons/matcap/check_rim_dark.jpg`}, 
-				{name: "Contours 1", icon: `${Potree.resourcePath}/icons/matcap/contours_1.jpg`}, 
-				{name: "Contours 2", icon: `${Potree.resourcePath}/icons/matcap/contours_2.jpg`}, 
-				{name: "Contours 3", icon: `${Potree.resourcePath}/icons/matcap/contours_3.jpg`}, 
-				{name: "Reflection Check Horizontal", icon: `${Potree.resourcePath}/icons/matcap/reflection_check_horizontal.jpg`}, 
-				{name: "Reflection Check Vertical", icon: `${Potree.resourcePath}/icons/matcap/reflection_check_vertical.jpg`}, 
-			];
+        {
+            let matcaps = [
+                {
+                    name: 'Normals',
+                    icon: `${Potree.resourcePath}/icons/matcap/check_normal+y.jpg`,
+                },
+                {
+                    name: 'Basic 1',
+                    icon: `${Potree.resourcePath}/icons/matcap/basic_1.jpg`,
+                },
+                {
+                    name: 'Basic 2',
+                    icon: `${Potree.resourcePath}/icons/matcap/basic_2.jpg`,
+                },
+                {
+                    name: 'Basic Dark',
+                    icon: `${Potree.resourcePath}/icons/matcap/basic_dark.jpg`,
+                },
+                {
+                    name: 'Basic Side',
+                    icon: `${Potree.resourcePath}/icons/matcap/basic_side.jpg`,
+                },
+                {
+                    name: 'Ceramic Dark',
+                    icon: `${Potree.resourcePath}/icons/matcap/ceramic_dark.jpg`,
+                },
+                {
+                    name: 'Ceramic Lightbulb',
+                    icon: `${Potree.resourcePath}/icons/matcap/ceramic_lightbulb.jpg`,
+                },
+                {
+                    name: 'Clay Brown',
+                    icon: `${Potree.resourcePath}/icons/matcap/clay_brown.jpg`,
+                },
+                {
+                    name: 'Clay Muddy',
+                    icon: `${Potree.resourcePath}/icons/matcap/clay_muddy.jpg`,
+                },
+                {
+                    name: 'Clay Studio',
+                    icon: `${Potree.resourcePath}/icons/matcap/clay_studio.jpg`,
+                },
+                {
+                    name: 'Resin',
+                    icon: `${Potree.resourcePath}/icons/matcap/resin.jpg`,
+                },
+                {
+                    name: 'Skin',
+                    icon: `${Potree.resourcePath}/icons/matcap/skin.jpg`,
+                },
+                {
+                    name: 'Jade',
+                    icon: `${Potree.resourcePath}/icons/matcap/jade.jpg`,
+                },
+                {
+                    name: 'Metal_ Anisotropic',
+                    icon: `${Potree.resourcePath}/icons/matcap/metal_anisotropic.jpg`,
+                },
+                {
+                    name: 'Metal Carpaint',
+                    icon: `${Potree.resourcePath}/icons/matcap/metal_carpaint.jpg`,
+                },
+                {
+                    name: 'Metal Lead',
+                    icon: `${Potree.resourcePath}/icons/matcap/metal_lead.jpg`,
+                },
+                {
+                    name: 'Metal Shiny',
+                    icon: `${Potree.resourcePath}/icons/matcap/metal_shiny.jpg`,
+                },
+                {
+                    name: 'Pearl',
+                    icon: `${Potree.resourcePath}/icons/matcap/pearl.jpg`,
+                },
+                {
+                    name: 'Toon',
+                    icon: `${Potree.resourcePath}/icons/matcap/toon.jpg`,
+                },
+                {
+                    name: 'Check Rim Light',
+                    icon: `${Potree.resourcePath}/icons/matcap/check_rim_light.jpg`,
+                },
+                {
+                    name: 'Check Rim Dark',
+                    icon: `${Potree.resourcePath}/icons/matcap/check_rim_dark.jpg`,
+                },
+                {
+                    name: 'Contours 1',
+                    icon: `${Potree.resourcePath}/icons/matcap/contours_1.jpg`,
+                },
+                {
+                    name: 'Contours 2',
+                    icon: `${Potree.resourcePath}/icons/matcap/contours_2.jpg`,
+                },
+                {
+                    name: 'Contours 3',
+                    icon: `${Potree.resourcePath}/icons/matcap/contours_3.jpg`,
+                },
+                {
+                    name: 'Reflection Check Horizontal',
+                    icon: `${Potree.resourcePath}/icons/matcap/reflection_check_horizontal.jpg`,
+                },
+                {
+                    name: 'Reflection Check Vertical',
+                    icon: `${Potree.resourcePath}/icons/matcap/reflection_check_vertical.jpg`,
+                },
+            ]
 
-			let elMatcapContainer = panel.find("#matcap_scheme_selection");
+            let elMatcapContainer = panel.find('#matcap_scheme_selection')
 
-			for(let matcap of matcaps){
-				let elMatcap = $(`
+            for (let matcap of matcaps) {
+                let elMatcap = $(`
 						<img src="${matcap.icon}" class="button-icon" style="width: 25%;" />
-				`);
+				`)
 
-				elMatcap.click( () => {
-					material.matcap = matcap.icon.substring(matcap.icon.lastIndexOf('/'));
-				});
+                elMatcap.click(() => {
+                    material.matcap = matcap.icon.substring(
+                        matcap.icon.lastIndexOf('/'),
+                    )
+                })
 
-				elMatcapContainer.append(elMatcap);
-			}
-		}
+                elMatcapContainer.append(elMatcap)
+            }
+        }
 
-		{
-			panel.find('#sldRGBGamma').slider({
-				value: material.rgbGamma,
-				min: 0, max: 4, step: 0.01,
-				slide: (event, ui) => {material.rgbGamma = ui.value}
-			});
+        {
+            panel.find('#sldRGBGamma').slider({
+                value: material.rgbGamma,
+                min: 0,
+                max: 4,
+                step: 0.01,
+                slide: (event, ui) => {
+                    material.rgbGamma = ui.value
+                },
+            })
 
-			panel.find('#sldRGBContrast').slider({
-				value: material.rgbContrast,
-				min: -1, max: 1, step: 0.01,
-				slide: (event, ui) => {material.rgbContrast = ui.value}
-			});
+            panel.find('#sldRGBContrast').slider({
+                value: material.rgbContrast,
+                min: -1,
+                max: 1,
+                step: 0.01,
+                slide: (event, ui) => {
+                    material.rgbContrast = ui.value
+                },
+            })
 
-			panel.find('#sldRGBBrightness').slider({
-				value: material.rgbBrightness,
-				min: -1, max: 1, step: 0.01,
-				slide: (event, ui) => {material.rgbBrightness = ui.value}
-			});
+            panel.find('#sldRGBBrightness').slider({
+                value: material.rgbBrightness,
+                min: -1,
+                max: 1,
+                step: 0.01,
+                slide: (event, ui) => {
+                    material.rgbBrightness = ui.value
+                },
+            })
 
-			panel.find('#sldExtraGamma').slider({
-				value: material.extraGamma,
-				min: 0, max: 4, step: 0.01,
-				slide: (event, ui) => {material.extraGamma = ui.value}
-			});
+            panel.find('#sldExtraGamma').slider({
+                value: material.extraGamma,
+                min: 0,
+                max: 4,
+                step: 0.01,
+                slide: (event, ui) => {
+                    material.extraGamma = ui.value
+                },
+            })
 
-			panel.find('#sldExtraBrightness').slider({
-				value: material.extraBrightness,
-				min: -1, max: 1, step: 0.01,
-				slide: (event, ui) => {material.extraBrightness = ui.value}
-			});
+            panel.find('#sldExtraBrightness').slider({
+                value: material.extraBrightness,
+                min: -1,
+                max: 1,
+                step: 0.01,
+                slide: (event, ui) => {
+                    material.extraBrightness = ui.value
+                },
+            })
 
-			panel.find('#sldExtraContrast').slider({
-				value: material.extraContrast,
-				min: -1, max: 1, step: 0.01,
-				slide: (event, ui) => {material.extraContrast = ui.value}
-			});
+            panel.find('#sldExtraContrast').slider({
+                value: material.extraContrast,
+                min: -1,
+                max: 1,
+                step: 0.01,
+                slide: (event, ui) => {
+                    material.extraContrast = ui.value
+                },
+            })
 
-			panel.find('#sldHeightRange').slider({
-				range: true,
-				min: 0, max: 1000, step: 0.01,
-				values: [0, 1000],
-				slide: (event, ui) => {
-					material.heightMin = ui.values[0];
-					material.heightMax = ui.values[1];
-				}
-			});
+            panel.find('#sldHeightRange').slider({
+                range: true,
+                min: 0,
+                max: 1000,
+                step: 0.01,
+                values: [0, 1000],
+                slide: (event, ui) => {
+                    material.heightMin = ui.values[0]
+                    material.heightMax = ui.values[1]
+                },
+            })
 
-			panel.find('#sldIntensityGamma').slider({
-				value: material.intensityGamma,
-				min: 0, max: 4, step: 0.01,
-				slide: (event, ui) => {material.intensityGamma = ui.value}
-			});
+            panel.find('#sldIntensityGamma').slider({
+                value: material.intensityGamma,
+                min: 0,
+                max: 4,
+                step: 0.01,
+                slide: (event, ui) => {
+                    material.intensityGamma = ui.value
+                },
+            })
 
-			panel.find('#sldIntensityContrast').slider({
-				value: material.intensityContrast,
-				min: -1, max: 1, step: 0.01,
-				slide: (event, ui) => {material.intensityContrast = ui.value}
-			});
+            panel.find('#sldIntensityContrast').slider({
+                value: material.intensityContrast,
+                min: -1,
+                max: 1,
+                step: 0.01,
+                slide: (event, ui) => {
+                    material.intensityContrast = ui.value
+                },
+            })
 
-			panel.find('#sldIntensityBrightness').slider({
-				value: material.intensityBrightness,
-				min: -1, max: 1, step: 0.01,
-				slide: (event, ui) => {material.intensityBrightness = ui.value}
-			});
+            panel.find('#sldIntensityBrightness').slider({
+                value: material.intensityBrightness,
+                min: -1,
+                max: 1,
+                step: 0.01,
+                slide: (event, ui) => {
+                    material.intensityBrightness = ui.value
+                },
+            })
 
-			panel.find('#sldWeightRGB').slider({
-				value: material.weightRGB,
-				min: 0, max: 1, step: 0.01,
-				slide: (event, ui) => {material.weightRGB = ui.value}
-			});
+            panel.find('#sldWeightRGB').slider({
+                value: material.weightRGB,
+                min: 0,
+                max: 1,
+                step: 0.01,
+                slide: (event, ui) => {
+                    material.weightRGB = ui.value
+                },
+            })
 
-			panel.find('#sldWeightIntensity').slider({
-				value: material.weightIntensity,
-				min: 0, max: 1, step: 0.01,
-				slide: (event, ui) => {material.weightIntensity = ui.value}
-			});
+            panel.find('#sldWeightIntensity').slider({
+                value: material.weightIntensity,
+                min: 0,
+                max: 1,
+                step: 0.01,
+                slide: (event, ui) => {
+                    material.weightIntensity = ui.value
+                },
+            })
 
-			panel.find('#sldWeightElevation').slider({
-				value: material.weightElevation,
-				min: 0, max: 1, step: 0.01,
-				slide: (event, ui) => {material.weightElevation = ui.value}
-			});
+            panel.find('#sldWeightElevation').slider({
+                value: material.weightElevation,
+                min: 0,
+                max: 1,
+                step: 0.01,
+                slide: (event, ui) => {
+                    material.weightElevation = ui.value
+                },
+            })
 
-			panel.find('#sldWeightClassification').slider({
-				value: material.weightClassification,
-				min: 0, max: 1, step: 0.01,
-				slide: (event, ui) => {material.weightClassification = ui.value}
-			});
+            panel.find('#sldWeightClassification').slider({
+                value: material.weightClassification,
+                min: 0,
+                max: 1,
+                step: 0.01,
+                slide: (event, ui) => {
+                    material.weightClassification = ui.value
+                },
+            })
 
-			panel.find('#sldWeightReturnNumber').slider({
-				value: material.weightReturnNumber,
-				min: 0, max: 1, step: 0.01,
-				slide: (event, ui) => {material.weightReturnNumber = ui.value}
-			});
+            panel.find('#sldWeightReturnNumber').slider({
+                value: material.weightReturnNumber,
+                min: 0,
+                max: 1,
+                step: 0.01,
+                slide: (event, ui) => {
+                    material.weightReturnNumber = ui.value
+                },
+            })
 
-			panel.find('#sldWeightSourceID').slider({
-				value: material.weightSourceID,
-				min: 0, max: 1, step: 0.01,
-				slide: (event, ui) => {material.weightSourceID = ui.value}
-			});
+            panel.find('#sldWeightSourceID').slider({
+                value: material.weightSourceID,
+                min: 0,
+                max: 1,
+                step: 0.01,
+                slide: (event, ui) => {
+                    material.weightSourceID = ui.value
+                },
+            })
 
-			panel.find(`#materials\\.color\\.picker`).spectrum({
-				flat: true,
-				showInput: true,
-				preferredFormat: 'rgb',
-				cancelText: '',
-				chooseText: 'Apply',
-				color: `#${material.color.getHexString()}`,
-				move: color => {
-					let cRGB = color.toRgb();
-					let tc = new THREE.Color().setRGB(cRGB.r / 255, cRGB.g / 255, cRGB.b / 255);
-					material.color = tc;
-				},
-				change: color => {
-					let cRGB = color.toRgb();
-					let tc = new THREE.Color().setRGB(cRGB.r / 255, cRGB.g / 255, cRGB.b / 255);
-					material.color = tc;
-				}
-			});
+            panel.find(`#materials\\.color\\.picker`).spectrum({
+                flat: true,
+                showInput: true,
+                preferredFormat: 'rgb',
+                cancelText: '',
+                chooseText: 'Apply',
+                color: `#${material.color.getHexString()}`,
+                move: (color) => {
+                    let cRGB = color.toRgb()
+                    let tc = new THREE.Color().setRGB(
+                        cRGB.r / 255,
+                        cRGB.g / 255,
+                        cRGB.b / 255,
+                    )
+                    material.color = tc
+                },
+                change: (color) => {
+                    let cRGB = color.toRgb()
+                    let tc = new THREE.Color().setRGB(
+                        cRGB.r / 255,
+                        cRGB.g / 255,
+                        cRGB.b / 255,
+                    )
+                    material.color = tc
+                },
+            })
 
-			this.addVolatileListener(material, "color_changed", () => {
-				panel.find(`#materials\\.color\\.picker`)
-					.spectrum('set', `#${material.color.getHexString()}`);
-			});
+            this.addVolatileListener(material, 'color_changed', () => {
+                panel
+                    .find(`#materials\\.color\\.picker`)
+                    .spectrum('set', `#${material.color.getHexString()}`)
+            })
 
-			let updateHeightRange = function () {
-				
+            let updateHeightRange = function () {
+                let aPosition = pointcloud.getAttribute('position')
 
-				let aPosition = pointcloud.getAttribute("position");
+                let bMin, bMax
 
-				let bMin, bMax;
+                if (aPosition) {
+                    // for new format 2.0 and loader that contain precomputed min/max of attributes
+                    let min = aPosition.range[0][2]
+                    let max = aPosition.range[1][2]
+                    let width = max - min
 
-				if(aPosition){
-					// for new format 2.0 and loader that contain precomputed min/max of attributes
-					let min = aPosition.range[0][2];
-					let max = aPosition.range[1][2];
-					let width = max - min;
+                    bMin = min - 0.2 * width
+                    bMax = max + 0.2 * width
+                } else {
+                    // for format up until exlusive 2.0
+                    let box = [
+                        pointcloud.pcoGeometry.tightBoundingBox,
+                        pointcloud.getBoundingBoxWorld(),
+                    ].find((v) => v !== undefined)
 
-					bMin = min - 0.2 * width;
-					bMax = max + 0.2 * width;
-				}else{
-					// for format up until exlusive 2.0
-					let box = [pointcloud.pcoGeometry.tightBoundingBox, pointcloud.getBoundingBoxWorld()]
-						.find(v => v !== undefined);
+                    pointcloud.updateMatrixWorld(true)
+                    box = Utils.computeTransformedBoundingBox(
+                        box,
+                        pointcloud.matrixWorld,
+                    )
 
-					pointcloud.updateMatrixWorld(true);
-					box = Utils.computeTransformedBoundingBox(box, pointcloud.matrixWorld);
+                    let bWidth = box.max.z - box.min.z
+                    bMin = box.min.z - 0.2 * bWidth
+                    bMax = box.max.z + 0.2 * bWidth
+                }
 
-					let bWidth = box.max.z - box.min.z;
-					bMin = box.min.z - 0.2 * bWidth;
-					bMax = box.max.z + 0.2 * bWidth;
-				}
+                let range = material.elevationRange
 
-				let range = material.elevationRange;
+                panel
+                    .find('#lblHeightRange')
+                    .html(`${range[0].toFixed(2)} to ${range[1].toFixed(2)}`)
+                panel
+                    .find('#sldHeightRange')
+                    .slider({ min: bMin, max: bMax, values: range })
+            }
 
-				panel.find('#lblHeightRange').html(`${range[0].toFixed(2)} to ${range[1].toFixed(2)}`);
-				panel.find('#sldHeightRange').slider({min: bMin, max: bMax, values: range});
-			};
+            let updateExtraRange = function () {
+                let attributeName = material.activeAttributeName
+                let attribute = pointcloud.getAttribute(attributeName)
 
-			let updateExtraRange = function () {
+                if (attribute == null) {
+                    return
+                }
 
-				let attributeName = material.activeAttributeName;
-				let attribute = pointcloud.getAttribute(attributeName);
+                let range = material.getRange(attributeName)
 
-				if(attribute == null){
-					return;
-				}
-				
-				let range = material.getRange(attributeName);
+                if (range == null) {
+                    range = attribute.range
+                }
 
-				if(range == null){
-					range = attribute.range;
-				}
+                // currently only supporting scalar ranges.
+                // rgba, normals, positions, etc have vector ranges, however
+                let isValidRange =
+                    typeof range[0] === 'number' && typeof range[1] === 'number'
+                if (!isValidRange) {
+                    return
+                }
 
-				// currently only supporting scalar ranges.
-				// rgba, normals, positions, etc have vector ranges, however
-				let isValidRange = (typeof range[0] === "number") && (typeof range[1] === "number");
-				if(!isValidRange){
-					return;
-				}
+                if (range) {
+                    let msg = `${range[0].toFixed(2)} to ${range[1].toFixed(2)}`
+                    panel.find('#lblExtraRange').html(msg)
+                } else {
+                    panel.find('could not deduce range')
+                }
+            }
 
-				if(range){
-					let msg = `${range[0].toFixed(2)} to ${range[1].toFixed(2)}`;
-					panel.find('#lblExtraRange').html(msg);
-				}else{
-					panel.find("could not deduce range");
-				}
-			};
+            let updateIntensityRange = function () {
+                let range = material.intensityRange
 
-			let updateIntensityRange = function () {
-				let range = material.intensityRange;
+                panel
+                    .find('#lblIntensityRange')
+                    .html(`${parseInt(range[0])} to ${parseInt(range[1])}`)
+            }
 
-				panel.find('#lblIntensityRange').html(`${parseInt(range[0])} to ${parseInt(range[1])}`);
-			};
+            {
+                updateHeightRange()
+                panel.find(`#sldHeightRange`).slider('option', 'min')
+                panel.find(`#sldHeightRange`).slider('option', 'max')
+            }
 
-			{
-				updateHeightRange();
-				panel.find(`#sldHeightRange`).slider('option', 'min');
-				panel.find(`#sldHeightRange`).slider('option', 'max');
-			}
+            {
+                let elGradientRepeat = panel.find('#gradient_repeat_option')
+                elGradientRepeat.selectgroup({ title: 'Gradient' })
 
-			{
-				let elGradientRepeat = panel.find("#gradient_repeat_option");
-				elGradientRepeat.selectgroup({title: "Gradient"});
+                elGradientRepeat.find('input').click((e) => {
+                    this.viewer.setElevationGradientRepeat(
+                        ElevationGradientRepeat[e.target.value],
+                    )
+                })
 
-				elGradientRepeat.find("input").click( (e) => {
-					this.viewer.setElevationGradientRepeat(ElevationGradientRepeat[e.target.value]);
-				});
+                let current = Object.keys(ElevationGradientRepeat).filter(
+                    (key) =>
+                        ElevationGradientRepeat[key] ===
+                        this.viewer.elevationGradientRepeat,
+                )
+                elGradientRepeat
+                    .find(`input[value=${current}]`)
+                    .trigger('click')
+            }
 
-				let current = Object.keys(ElevationGradientRepeat)
-					.filter(key => ElevationGradientRepeat[key] === this.viewer.elevationGradientRepeat);
-				elGradientRepeat.find(`input[value=${current}]`).trigger("click");
-			}
+            let onIntensityChange = () => {
+                let gamma = material.intensityGamma
+                let contrast = material.intensityContrast
+                let brightness = material.intensityBrightness
 
-			let onIntensityChange = () => {
-				let gamma = material.intensityGamma;
-				let contrast = material.intensityContrast;
-				let brightness = material.intensityBrightness;
+                updateIntensityRange()
 
-				updateIntensityRange();
+                panel.find('#lblIntensityGamma').html(gamma.toFixed(2))
+                panel.find('#lblIntensityContrast').html(contrast.toFixed(2))
+                panel
+                    .find('#lblIntensityBrightness')
+                    .html(brightness.toFixed(2))
 
-				panel.find('#lblIntensityGamma').html(gamma.toFixed(2));
-				panel.find('#lblIntensityContrast').html(contrast.toFixed(2));
-				panel.find('#lblIntensityBrightness').html(brightness.toFixed(2));
+                panel.find('#sldIntensityGamma').slider({ value: gamma })
+                panel.find('#sldIntensityContrast').slider({ value: contrast })
+                panel
+                    .find('#sldIntensityBrightness')
+                    .slider({ value: brightness })
+            }
 
-				panel.find('#sldIntensityGamma').slider({value: gamma});
-				panel.find('#sldIntensityContrast').slider({value: contrast});
-				panel.find('#sldIntensityBrightness').slider({value: brightness});
-			};
+            let onRGBChange = () => {
+                let gamma = material.rgbGamma
+                let contrast = material.rgbContrast
+                let brightness = material.rgbBrightness
 
-			let onRGBChange = () => {
-				let gamma = material.rgbGamma;
-				let contrast = material.rgbContrast;
-				let brightness = material.rgbBrightness;
+                panel.find('#lblRGBGamma').html(gamma.toFixed(2))
+                panel.find('#lblRGBContrast').html(contrast.toFixed(2))
+                panel.find('#lblRGBBrightness').html(brightness.toFixed(2))
 
-				panel.find('#lblRGBGamma').html(gamma.toFixed(2));
-				panel.find('#lblRGBContrast').html(contrast.toFixed(2));
-				panel.find('#lblRGBBrightness').html(brightness.toFixed(2));
+                panel.find('#sldRGBGamma').slider({ value: gamma })
+                panel.find('#sldRGBContrast').slider({ value: contrast })
+                panel.find('#sldRGBBrightness').slider({ value: brightness })
+            }
 
-				panel.find('#sldRGBGamma').slider({value: gamma});
-				panel.find('#sldRGBContrast').slider({value: contrast});
-				panel.find('#sldRGBBrightness').slider({value: brightness});
-			};
+            this.addVolatileListener(
+                material,
+                'material_property_changed',
+                updateExtraRange,
+            )
+            this.addVolatileListener(
+                material,
+                'material_property_changed',
+                updateHeightRange,
+            )
+            this.addVolatileListener(
+                material,
+                'material_property_changed',
+                onIntensityChange,
+            )
+            this.addVolatileListener(
+                material,
+                'material_property_changed',
+                onRGBChange,
+            )
 
-			this.addVolatileListener(material, "material_property_changed", updateExtraRange);
-			this.addVolatileListener(material, "material_property_changed", updateHeightRange);
-			this.addVolatileListener(material, "material_property_changed", onIntensityChange);
-			this.addVolatileListener(material, "material_property_changed", onRGBChange);
+            updateExtraRange()
+            updateHeightRange()
+            onIntensityChange()
+            onRGBChange()
+        }
+    }
 
-			updateExtraRange();
-			updateHeightRange();
-			onIntensityChange();
-			onRGBChange();
-		}
+    setMeasurement(object) {
+        let TYPE = {
+            DISTANCE: { panel: DistancePanel },
+            AREA: { panel: AreaPanel },
+            POINT: { panel: PointPanel },
+            ANGLE: { panel: AnglePanel },
+            HEIGHT: { panel: HeightPanel },
+            PROFILE: { panel: ProfilePanel },
+            VOLUME: { panel: VolumePanel },
+            CIRCLE: { panel: CirclePanel },
+            OTHER: { panel: PointPanel },
+        }
 
-	}
+        let getType = (measurement) => {
+            if (measurement instanceof Measure) {
+                if (
+                    measurement.showDistances &&
+                    !measurement.showArea &&
+                    !measurement.showAngles
+                ) {
+                    return TYPE.DISTANCE
+                } else if (
+                    measurement.showDistances &&
+                    measurement.showArea &&
+                    !measurement.showAngles
+                ) {
+                    return TYPE.AREA
+                } else if (measurement.maxMarkers === 1) {
+                    return TYPE.POINT
+                } else if (
+                    !measurement.showDistances &&
+                    !measurement.showArea &&
+                    measurement.showAngles
+                ) {
+                    return TYPE.ANGLE
+                } else if (measurement.showHeight) {
+                    return TYPE.HEIGHT
+                } else if (measurement.showCircle) {
+                    return TYPE.CIRCLE
+                } else {
+                    return TYPE.OTHER
+                }
+            } else if (measurement instanceof Profile) {
+                return TYPE.PROFILE
+            } else if (measurement instanceof Volume) {
+                return TYPE.VOLUME
+            }
+        }
 
-	
+        //this.container.html("measurement");
 
-	setMeasurement(object){
+        let type = getType(object)
+        let Panel = type.panel
 
-		let TYPE = {
-			DISTANCE: {panel: DistancePanel},
-			AREA: {panel: AreaPanel},
-			POINT: {panel: PointPanel},
-			ANGLE: {panel: AnglePanel},
-			HEIGHT: {panel: HeightPanel},
-			PROFILE: {panel: ProfilePanel},
-			VOLUME: {panel: VolumePanel},
-			CIRCLE: {panel: CirclePanel},
-			OTHER: {panel: PointPanel},
-		};
+        let panel = new Panel(this.viewer, object, this)
+        this.container.append(panel.elContent)
+    }
 
-		let getType = (measurement) => {
-			if (measurement instanceof Measure) {
-				if (measurement.showDistances && !measurement.showArea && !measurement.showAngles) {
-					return TYPE.DISTANCE;
-				} else if (measurement.showDistances && measurement.showArea && !measurement.showAngles) {
-					return TYPE.AREA;
-				} else if (measurement.maxMarkers === 1) {
-					return TYPE.POINT;
-				} else if (!measurement.showDistances && !measurement.showArea && measurement.showAngles) {
-					return TYPE.ANGLE;
-				} else if (measurement.showHeight) {
-					return TYPE.HEIGHT;
-				} else if (measurement.showCircle) {
-					return TYPE.CIRCLE;
-				} else {
-					return TYPE.OTHER;
-				}
-			} else if (measurement instanceof Profile) {
-				return TYPE.PROFILE;
-			} else if (measurement instanceof Volume) {
-				return TYPE.VOLUME;
-			}
-		};
+    setCamera(camera) {
+        let panel = new CameraPanel(this.viewer, this)
+        this.container.append(panel.elContent)
+    }
 
-		//this.container.html("measurement");
+    setAnnotation(annotation) {
+        let panel = new AnnotationPanel(this.viewer, this, annotation)
+        this.container.append(panel.elContent)
+    }
 
-		let type = getType(object);
-		let Panel = type.panel;
-
-		let panel = new Panel(this.viewer, object, this);
-		this.container.append(panel.elContent);
-	}
-
-	setCamera(camera){
-		let panel = new CameraPanel(this.viewer, this);
-		this.container.append(panel.elContent);
-	}
-
-	setAnnotation(annotation){
-		let panel = new AnnotationPanel(this.viewer, this, annotation);
-		this.container.append(panel.elContent);
-	}
-
-	setCameraAnimation(animation){
-		let panel = new CameraAnimationPanel(this.viewer, this, animation)
-		this.container.append(panel.elContent);
-	}
-
+    setCameraAnimation(animation) {
+        let panel = new CameraAnimationPanel(this.viewer, this, animation)
+        this.container.append(panel.elContent)
+    }
 }

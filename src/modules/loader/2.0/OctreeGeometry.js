@@ -1,102 +1,96 @@
+import * as THREE from '../../../../libs/three.js/build/three.module.js'
 
-import * as THREE from "../../../../libs/three.js/build/three.module.js";
+export class OctreeGeometry {
+    constructor() {
+        this.url = null
+        this.spacing = 0
+        this.boundingBox = null
+        this.root = null
+        this.pointAttributes = null
+        this.loader = null
+    }
+}
 
-export class OctreeGeometry{
+export class OctreeGeometryNode {
+    constructor(name, octreeGeometry, boundingBox) {
+        this.id = OctreeGeometryNode.IDCount++
+        this.name = name
+        this.index = parseInt(name.charAt(name.length - 1))
+        this.octreeGeometry = octreeGeometry
+        this.boundingBox = boundingBox
+        this.boundingSphere = boundingBox.getBoundingSphere(new THREE.Sphere())
+        this.children = {}
+        this.numPoints = 0
+        this.level = null
+        this.oneTimeDisposeHandlers = []
+    }
 
-	constructor(){
-		this.url = null;
-		this.spacing = 0;
-		this.boundingBox = null;
-		this.root = null;
-		this.pointAttributes = null;
-		this.loader = null;
-	}
+    isGeometryNode() {
+        return true
+    }
 
-};
+    getLevel() {
+        return this.level
+    }
 
-export class OctreeGeometryNode{
+    isTreeNode() {
+        return false
+    }
 
-	constructor(name, octreeGeometry, boundingBox){
-		this.id = OctreeGeometryNode.IDCount++;
-		this.name = name;
-		this.index = parseInt(name.charAt(name.length - 1));
-		this.octreeGeometry = octreeGeometry;
-		this.boundingBox = boundingBox;
-		this.boundingSphere = boundingBox.getBoundingSphere(new THREE.Sphere());
-		this.children = {};
-		this.numPoints = 0;
-		this.level = null;
-		this.oneTimeDisposeHandlers = [];
-	}
+    isLoaded() {
+        return this.loaded
+    }
 
-	isGeometryNode(){
-		return true;
-	}
+    getBoundingSphere() {
+        return this.boundingSphere
+    }
 
-	getLevel(){
-		return this.level;
-	}
+    getBoundingBox() {
+        return this.boundingBox
+    }
 
-	isTreeNode(){
-		return false;
-	}
+    getChildren() {
+        let children = []
 
-	isLoaded(){
-		return this.loaded;
-	}
+        for (let i = 0; i < 8; i++) {
+            if (this.children[i]) {
+                children.push(this.children[i])
+            }
+        }
 
-	getBoundingSphere(){
-		return this.boundingSphere;
-	}
+        return children
+    }
 
-	getBoundingBox(){
-		return this.boundingBox;
-	}
+    getBoundingBox() {
+        return this.boundingBox
+    }
 
-	getChildren(){
-		let children = [];
+    load() {
+        if (Potree.numNodesLoading >= Potree.maxNodesLoading) {
+            return
+        }
 
-		for (let i = 0; i < 8; i++) {
-			if (this.children[i]) {
-				children.push(this.children[i]);
-			}
-		}
+        this.octreeGeometry.loader.load(this)
+    }
 
-		return children;
-	}
+    getNumPoints() {
+        return this.numPoints
+    }
 
-	getBoundingBox(){
-		return this.boundingBox;
-	}
+    dispose() {
+        if (this.geometry && this.parent != null) {
+            this.geometry.dispose()
+            this.geometry = null
+            this.loaded = false
 
-	load(){
+            // this.dispatchEvent( { type: 'dispose' } );
+            for (let i = 0; i < this.oneTimeDisposeHandlers.length; i++) {
+                let handler = this.oneTimeDisposeHandlers[i]
+                handler()
+            }
+            this.oneTimeDisposeHandlers = []
+        }
+    }
+}
 
-		if (Potree.numNodesLoading >= Potree.maxNodesLoading) {
-			return;
-		}
-
-		this.octreeGeometry.loader.load(this);
-	}
-
-	getNumPoints(){
-		return this.numPoints;
-	}
-
-	dispose(){
-		if (this.geometry && this.parent != null) {
-			this.geometry.dispose();
-			this.geometry = null;
-			this.loaded = false;
-
-			// this.dispatchEvent( { type: 'dispose' } );
-			for (let i = 0; i < this.oneTimeDisposeHandlers.length; i++) {
-				let handler = this.oneTimeDisposeHandlers[i];
-				handler();
-			}
-			this.oneTimeDisposeHandlers = [];
-		}
-	}
-
-};
-
-OctreeGeometryNode.IDCount = 0;
+OctreeGeometryNode.IDCount = 0

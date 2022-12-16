@@ -1,80 +1,74 @@
+const path = require('path')
+const fs = require('fs')
+const fsp = fs.promises
+const JSON5 = require('json5')
 
-const path = require('path');
-const fs = require("fs");
-const fsp = fs.promises;
-const JSON5 = require('json5');
+async function createExamplesPage() {
+    const content = await fsp.readFile('./examples/page.json', 'utf8')
+    const settings = JSON5.parse(content)
 
+    const files = await fsp.readdir('./examples')
 
-async function createExamplesPage(){
+    let unhandledCode = ``
+    let exampleCode = ``
+    let showcaseCode = ``
+    let thirdpartyCode = ``
 
-	const content = await fsp.readFile("./examples/page.json", 'utf8');
-	const settings = JSON5.parse(content);
+    {
+        let urls = settings.examples.map((e) => e.url)
+        let unhandled = []
+        for (let file of files) {
+            let isHandled = false
+            for (let url of urls) {
+                if (file.indexOf(url) !== -1) {
+                    isHandled = true
+                }
+            }
 
-	const files = await fsp.readdir("./examples");
+            if (!isHandled) {
+                unhandled.push(file)
+            }
+        }
+        unhandled = unhandled
+            .filter((file) => file.indexOf('.html') > 0)
+            .filter((file) => file !== 'page.html')
 
-	let unhandledCode = ``;
-	let exampleCode = ``;
-	let showcaseCode = ``;
-	let thirdpartyCode = ``;
-
-	{
-		let urls = settings.examples.map(e => e.url);
-		let unhandled = [];
-		for(let file of files){
-			let isHandled = false;
-			for(let url of urls){
-
-				if(file.indexOf(url) !== -1){
-					isHandled = true;
-				}
-			}
-
-			if(!isHandled){
-				unhandled.push(file);
-			}
-		}
-		unhandled = unhandled
-			.filter(file => file.indexOf(".html") > 0)
-			.filter(file => file !== "page.html");
-
-
-		for(let file of unhandled){
-			unhandledCode += `
+        for (let file of unhandled) {
+            unhandledCode += `
 				<a href="${file}" class="unhandled">${file}</a>
-			`;
-		}
-	}
+			`
+        }
+    }
 
-	for(let example of settings.examples){
-		exampleCode += `
+    for (let example of settings.examples) {
+        exampleCode += `
 		<a href="${example.url}" target="_blank" style="display: inline-block">
 			<div class="thumb" style="background-image: url('${example.thumb}'); ">
 				<div class="thumb-label">${example.label}</div>
 			</div>
 		</a>
-		`;
-	}
+		`
+    }
 
-	for(let showcaseItem of settings.showcase){
-		showcaseCode += `<a href="${showcaseItem.url}" target="_blank" style="display: inline-block">
+    for (let showcaseItem of settings.showcase) {
+        showcaseCode += `<a href="${showcaseItem.url}" target="_blank" style="display: inline-block">
 			<div class="thumb" style="background-image: url('${showcaseItem.thumb}'); ">
 				<div class="thumb-label">${showcaseItem.label}</div>
 			</div>
 		</a>
-		`;
-	}
+		`
+    }
 
-	for(let item of settings.thirdparty){
-		thirdpartyCode += `<a href="${item.url}" target="_blank" style="display: inline-block">
+    for (let item of settings.thirdparty) {
+        thirdpartyCode += `<a href="${item.url}" target="_blank" style="display: inline-block">
 			<div class="thumb" style="background-image: url('${item.thumb}'); ">
 				<div class="thumb-label">${item.label}</div>
 			</div>
 		</a>
-		`;
-	}
+		`
+    }
 
-
-	let page = `
+    let page = `
 		<html>
 			<head>
 			<style>
@@ -213,18 +207,15 @@ async function createExamplesPage(){
 
 			</body>
 		</html>
-	`;
+	`
 
-	fs.writeFile(`examples/page.html`, page, (err) => {
-		if(err){
-			console.log(err);
-		}else{
-			console.log(`created examples/page.html`);
-		}
-	});
+    fs.writeFile(`examples/page.html`, page, (err) => {
+        if (err) {
+            console.log(err)
+        } else {
+            console.log(`created examples/page.html`)
+        }
+    })
 }
 
-
-
-
-exports.createExamplesPage = createExamplesPage;
+exports.createExamplesPage = createExamplesPage

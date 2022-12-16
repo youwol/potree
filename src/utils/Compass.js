@@ -1,58 +1,57 @@
+import * as THREE from '../../libs/three.js/build/three.module.js'
 
-import * as THREE from "../../libs/three.js/build/three.module.js";
+import { Utils } from '../utils.js'
 
-import {Utils} from "../utils.js";
+export class Compass {
+    constructor(viewer) {
+        this.viewer = viewer
 
-export class Compass{
+        this.visible = false
+        this.dom = this.createElement()
 
-	constructor(viewer){
-		this.viewer = viewer;
+        viewer.addEventListener('update', () => {
+            const direction = viewer.scene.view.direction.clone()
+            direction.z = 0
+            direction.normalize()
 
-		this.visible = false;
-		this.dom = this.createElement();
+            const camera = viewer.scene.getActiveCamera()
 
-		viewer.addEventListener("update", () => {
-			const direction = viewer.scene.view.direction.clone();
-			direction.z = 0;
-			direction.normalize();
+            const p1 = camera.getWorldPosition(new THREE.Vector3())
+            const p2 = p1.clone().add(direction)
 
-			const camera = viewer.scene.getActiveCamera();
+            const projection = viewer.getProjection()
+            const azimuth = Utils.computeAzimuth(p1, p2, projection)
 
-			const p1 = camera.getWorldPosition(new THREE.Vector3());
-			const p2 = p1.clone().add(direction);
+            this.dom.css('transform', `rotateZ(${-azimuth}rad)`)
+        })
 
-			const projection = viewer.getProjection();
-			const azimuth = Utils.computeAzimuth(p1, p2, projection);
-			
-			this.dom.css("transform", `rotateZ(${-azimuth}rad)`);
-		});
+        this.dom.click(() => {
+            viewer.setTopView()
+        })
 
-		this.dom.click( () => {
-			viewer.setTopView();
-		});
+        const renderArea = $(viewer.renderArea)
+        renderArea.append(this.dom)
 
-		const renderArea = $(viewer.renderArea);
-		renderArea.append(this.dom);
+        this.setVisible(this.visible)
+    }
 
-		this.setVisible(this.visible);
-	}
+    setVisible(visible) {
+        this.visible = visible
 
-	setVisible(visible){
-		this.visible = visible;
+        const value = visible ? '' : 'none'
+        this.dom.css('display', value)
+    }
 
-		const value = visible ? "" : "none";
-		this.dom.css("display", value);
-	}
+    isVisible() {
+        return this.visible
+    }
 
-	isVisible(){
-		return this.visible;
-	}
+    createElement() {
+        const style = `style="position: absolute; top: 10px; right: 10px; z-index: 10000; width: 64px;"`
+        const img = $(
+            `<img src="${Potree.resourcePath}/images/compas.svg" ${style} />`,
+        )
 
-	createElement(){
-		const style = `style="position: absolute; top: 10px; right: 10px; z-index: 10000; width: 64px;"`;
-		const img = $(`<img src="${Potree.resourcePath}/images/compas.svg" ${style} />`);
-
-		return img;
-	}
-
-};
+        return img
+    }
+}

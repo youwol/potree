@@ -19,32 +19,32 @@
  *
  */
 BitReader = function (buf) {
-	let buffer = new Uint32Array(buf);
-	let bitOffset = 0;
+    let buffer = new Uint32Array(buf)
+    let bitOffset = 0
 
-	this.read = function (bits) {
-		let result;
+    this.read = function (bits) {
+        let result
 
-		// TODO val & leftGap seem to be duplicate code? Move out of if-block
-		if ((bitOffset % 32) + bits <= 32) {
-			let val = buffer[Math.floor(bitOffset / 32)];
-			let leftGap = bitOffset % 32;
-			let rightGap = 32 - (leftGap + bits);
+        // TODO val & leftGap seem to be duplicate code? Move out of if-block
+        if ((bitOffset % 32) + bits <= 32) {
+            let val = buffer[Math.floor(bitOffset / 32)]
+            let leftGap = bitOffset % 32
+            let rightGap = 32 - (leftGap + bits)
 
-			result = (val << leftGap) >>> (leftGap + rightGap);
-		} else {
-			let val = buffer[Math.floor(bitOffset / 32)];
-			let leftGap = bitOffset % 32;
-			let rightGap = (leftGap + bits) - 32;
+            result = (val << leftGap) >>> (leftGap + rightGap)
+        } else {
+            let val = buffer[Math.floor(bitOffset / 32)]
+            let leftGap = bitOffset % 32
+            let rightGap = leftGap + bits - 32
 
-			result = (val << leftGap) >>> (leftGap - rightGap);
+            result = (val << leftGap) >>> (leftGap - rightGap)
 
-			val = buffer[Math.floor(bitOffset / 32) + 1];
-			result = result | val >>> (32 - rightGap);
-		}
+            val = buffer[Math.floor(bitOffset / 32) + 1]
+            result = result | (val >>> (32 - rightGap))
+        }
 
-		bitOffset += bits;
+        bitOffset += bits
 
-		return result;
-	};
-};
+        return result
+    }
+}

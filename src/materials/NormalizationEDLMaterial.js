@@ -1,72 +1,70 @@
+import * as THREE from '../../libs/three.js/build/three.module.js'
+import { Shaders } from '../../build/shaders/shaders.js'
 
-import * as THREE from "../../libs/three.js/build/three.module.js";
-import {Shaders} from "../../build/shaders/shaders.js";
+export class NormalizationEDLMaterial extends THREE.RawShaderMaterial {
+    constructor(parameters = {}) {
+        super()
 
+        let uniforms = {
+            screenWidth: { type: 'f', value: 0 },
+            screenHeight: { type: 'f', value: 0 },
+            edlStrength: { type: 'f', value: 1.0 },
+            radius: { type: 'f', value: 1.0 },
+            neighbours: { type: '2fv', value: [] },
+            uEDLMap: { type: 't', value: null },
+            uDepthMap: { type: 't', value: null },
+            uWeightMap: { type: 't', value: null },
+        }
 
-export class NormalizationEDLMaterial extends THREE.RawShaderMaterial{
+        this.setValues({
+            uniforms: uniforms,
+            vertexShader: this.getDefines() + Shaders['normalize.vs'],
+            fragmentShader: this.getDefines() + Shaders['normalize_and_edl.fs'],
+        })
 
-	constructor(parameters = {}){
-		super();
+        this.neighbourCount = 8
+    }
 
-		let uniforms = {
-			screenWidth:    { type: 'f',   value: 0 },
-			screenHeight:   { type: 'f',   value: 0 },
-			edlStrength:    { type: 'f',   value: 1.0 },
-			radius:         { type: 'f',   value: 1.0 },
-			neighbours:     { type: '2fv', value: [] },
-			uEDLMap:        { type: 't',   value: null },
-			uDepthMap:      { type: 't',   value: null },
-			uWeightMap:     { type: 't',   value: null },
-		};
+    getDefines() {
+        let defines = ''
 
-		this.setValues({
-			uniforms: uniforms,
-			vertexShader: this.getDefines() + Shaders['normalize.vs'],
-			fragmentShader: this.getDefines() + Shaders['normalize_and_edl.fs'],
-		});
+        defines += '#define NEIGHBOUR_COUNT ' + this.neighbourCount + '\n'
 
-		this.neighbourCount = 8;
-	}
+        return defines
+    }
 
-	getDefines() {
-		let defines = '';
+    updateShaderSource() {
+        let vs = this.getDefines() + Shaders['normalize.vs']
+        let fs = this.getDefines() + Shaders['normalize_and_edl.fs']
 
-		defines += '#define NEIGHBOUR_COUNT ' + this.neighbourCount + '\n';
+        this.setValues({
+            vertexShader: vs,
+            fragmentShader: fs,
+        })
 
-		return defines;
-	}
+        this.uniforms.neighbours.value = this.neighbours
 
-	updateShaderSource() {
+        this.needsUpdate = true
+    }
 
-		let vs = this.getDefines() + Shaders['normalize.vs'];
-		let fs = this.getDefines() + Shaders['normalize_and_edl.fs'];
+    get neighbourCount() {
+        return this._neighbourCount
+    }
 
-		this.setValues({
-			vertexShader: vs,
-			fragmentShader: fs
-		});
+    set neighbourCount(value) {
+        if (this._neighbourCount !== value) {
+            this._neighbourCount = value
+            this.neighbours = new Float32Array(this._neighbourCount * 2)
+            for (let c = 0; c < this._neighbourCount; c++) {
+                this.neighbours[2 * c + 0] = Math.cos(
+                    (2 * c * Math.PI) / this._neighbourCount,
+                )
+                this.neighbours[2 * c + 1] = Math.sin(
+                    (2 * c * Math.PI) / this._neighbourCount,
+                )
+            }
 
-		this.uniforms.neighbours.value = this.neighbours;
-
-		this.needsUpdate = true;
-	}
-
-	get neighbourCount(){
-		return this._neighbourCount;
-	}
-
-	set neighbourCount(value){
-		if (this._neighbourCount !== value) {
-			this._neighbourCount = value;
-			this.neighbours = new Float32Array(this._neighbourCount * 2);
-			for (let c = 0; c < this._neighbourCount; c++) {
-				this.neighbours[2 * c + 0] = Math.cos(2 * c * Math.PI / this._neighbourCount);
-				this.neighbours[2 * c + 1] = Math.sin(2 * c * Math.PI / this._neighbourCount);
-			}
-
-			this.updateShaderSource();
-		}
-	}
-	
+            this.updateShaderSource()
+        }
+    }
 }
-

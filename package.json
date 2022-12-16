@@ -28,6 +28,16 @@
     "rollup": "^1.31.1",
     "through": "~2.3.4"
   },
+  "devDependencies": {
+    "@youwol/prettier-config": "^0.0.2",
+    "@youwol/eslint-config": "^0.0.4"
+  },
+  "prettier": "@youwol/prettier-config",
+  "eslintConfig": {
+    "extends": [
+      "@youwol"
+    ]
+  },
   "author": "greinisch@youwol.com",
   "license": "BSD-2-CLAUSE",
   "youwol": {

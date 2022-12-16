@@ -1,6 +1,6 @@
 {
   "name": "@youwol/potree",
-  "version": "0.1.0",
+  "version": "0.1.1-wip",
   "description": "Migration of [Potree project](https://github.com/potree/potree) as standalone lib for YouWol ecosystem",
   "keywords": [
     "youwol",
